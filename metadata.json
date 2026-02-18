@@ -1,0 +1,5 @@
+{
+  "name": "SentinelDork Pro v3.0",
+  "description": "An advanced security reconnaissance toolkit for Bug Bounty hunters, featuring automated search dorking, AI-powered risk analysis, and multi-engine optimization.",
+  "requestFramePermissions": []
+}
