@@ -1,57 +1,44 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysis } from "../types";
 
-const apiKey = import.meta.env.VITE_API_KEY || '';
-let genAI: GoogleGenAI | null = null;
+/**
+ * AI analysis is served by the serverless proxy at /api/gemini (see api/gemini.ts).
+ *
+ * SECURITY: the browser never sees a Gemini API key. The old behavior of
+ * embedding VITE_API_KEY into the static build was removed because any key
+ * shipped to the client is effectively public.
+ *
+ * Set VITE_GEMINI_PROXY only if you host the proxy at a different origin.
+ */
+const PROXY_URL: string = import.meta.env.VITE_GEMINI_PROXY || "/api/gemini";
 
-if (apiKey) {
-  genAI = new GoogleGenAI({ apiKey });
-}
+const unavailable = (message: string): AIAnalysis => ({
+  explanation: message,
+  remediation: "—",
+  riskLevel: "Unknown",
+});
 
 export const analyzeDork = async (title: string, query: string): Promise<AIAnalysis> => {
-  if (!genAI) {
-    return {
-      explanation: "AI analysis is unavailable because no API key was provided.",
-      remediation: "Please configure VITE_API_KEY in your environment.",
-      riskLevel: "Unknown"
-    };
-  }
-
-  const model = "gemini-2.0-flash";
-  
   try {
-    const response = await genAI.models.generateContent({
-      model,
-      contents: `Analyze the following Google Dork (advanced search query) used in bug bounty hunting:
-      Title: ${title}
-      Query: ${query}
-
-      Provide:
-      1. A detailed explanation of why this query is dangerous.
-      2. Specific remediation steps for a web administrator.
-      3. An overall risk level (Critical, High, Medium, Low).`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            explanation: { type: Type.STRING },
-            remediation: { type: Type.STRING },
-            riskLevel: { type: Type.STRING },
-          },
-          required: ["explanation", "remediation", "riskLevel"]
-        }
-      }
+    const response = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, query }),
     });
 
-    return JSON.parse(response.text || '{}') as AIAnalysis;
-  } catch (e) {
-    console.error("AI Analysis failed:", e);
-    return {
-      explanation: "Failed to get or parse AI response.",
-      remediation: "Check server logs and configurations manually.",
-      riskLevel: "Unknown"
-    };
+    if (response.status === 503) {
+      return unavailable("AI analysis is not configured on this deployment (server-side GEMINI_API_KEY missing).");
+    }
+    if (!response.ok) {
+      return unavailable(`AI proxy error (HTTP ${response.status}).`);
+    }
+
+    const data = await response.json();
+    if (data && typeof data.explanation === "string" && typeof data.remediation === "string") {
+      return data as AIAnalysis;
+    }
+    return unavailable("AI proxy returned an unexpected response.");
+  } catch {
+    return unavailable("AI analysis unavailable — this static deployment has no /api/gemini proxy (see README).");
   }
 };
