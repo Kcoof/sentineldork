@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { DORKS_DB } from './constants';
 import { DorkItem, SearchEngine, AIAnalysis } from './types';
-import { analyzeDork } from './services/geminiService';
+import { analyzeDork } from './services/aiService';
 
 const App: React.FC = () => {
   const [target, setTarget] = useState('example.com');

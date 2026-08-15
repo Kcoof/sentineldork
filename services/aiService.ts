@@ -2,15 +2,16 @@
 import { AIAnalysis } from "../types";
 
 /**
- * AI analysis is served by the serverless proxy at /api/gemini (see api/gemini.ts).
+ * AI analysis is served by the serverless proxy at /api/ai (see api/ai.ts),
+ * which talks to GLM (Z.ai) or Gemini while keeping the API key server-side.
  *
- * SECURITY: the browser never sees a Gemini API key. The old behavior of
- * embedding VITE_API_KEY into the static build was removed because any key
- * shipped to the client is effectively public.
+ * SECURITY: the browser never sees any API key. The old behavior of embedding
+ * VITE_API_KEY into the static build was removed because any key shipped to
+ * the client is effectively public.
  *
- * Set VITE_GEMINI_PROXY only if you host the proxy at a different origin.
+ * Set VITE_AI_PROXY only if you host the proxy at a different origin.
  */
-const PROXY_URL: string = import.meta.env.VITE_GEMINI_PROXY || "/api/gemini";
+const PROXY_URL: string = import.meta.env.VITE_AI_PROXY || "/api/ai";
 
 const unavailable = (message: string): AIAnalysis => ({
   explanation: message,
@@ -27,7 +28,7 @@ export const analyzeDork = async (title: string, query: string): Promise<AIAnaly
     });
 
     if (response.status === 503) {
-      return unavailable("AI analysis is not configured on this deployment (server-side GEMINI_API_KEY missing).");
+      return unavailable("AI analysis is not configured on this deployment (server-side GLM_API_KEY missing).");
     }
     if (!response.ok) {
       return unavailable(`AI proxy error (HTTP ${response.status}).`);
@@ -39,6 +40,6 @@ export const analyzeDork = async (title: string, query: string): Promise<AIAnaly
     }
     return unavailable("AI proxy returned an unexpected response.");
   } catch {
-    return unavailable("AI analysis unavailable — this static deployment has no /api/gemini proxy (see README).");
+    return unavailable("AI analysis unavailable — this static deployment has no /api/ai proxy (see README).");
   }
 };
