@@ -1,66 +1,93 @@
-# 🛡️ SentinelDork Pro v3.1
+# SentinelDork
 
-**SentinelDork Pro** is a high-performance security reconnaissance toolkit designed for Bug Bounty hunters and Penetration Testers. It leverages advanced search engine dorking techniques and GLM AI to identify exposed assets, sensitive files, and infrastructure misconfigurations.
+**A dorking workbench for finding exposed assets — pick a query, pick an engine, search.**
 
-## ✨ Key Features
+SentinelDork ships a curated library of Google-dork templates for the exposures bug bounty hunters actually look for: open S3 buckets, exposed Azure containers, Terraform state files, `.env` files, leaked Firebase configs, public Jira dashboards. You type a domain, click a template, and it builds the query and runs it on the search engine of your choice — Google, Bing, DuckDuckGo, Shodan, or Censys — with the syntax corrected per engine.
 
-- **🎯 Precision Dorking**: Pre-configured templates for AWS S3, Azure Blobs, Firebase, K8s, and more.
-- **🤖 AI Risk Analysis**: Real-time vulnerability assessment powered by GLM (Z.ai), **through a serverless proxy so the API key never reaches the browser**.
-- **🔍 Multi-Engine Support**: Seamlessly switch between Google, Bing, DuckDuckGo, Shodan, and Censys.
-- **⚡ Pro UI/UX**: Built with React & Tailwind CSS for a terminal-grade, high-productivity interface.
-- **🔒 Compliance Focused**: Designed for ethical security testing and asset discovery.
+It is built for people who do recon manually and want the query library and the engine plumbing handled for them, not a black box that scrapes everything.
 
-## 🚀 Deployment
+---
 
-### Vercel (recommended — AI analysis included)
+## What's inside
 
-1. Push this repository to GitHub.
-2. Import the repo on [vercel.com](https://vercel.com) (Vite is auto-detected; `api/ai.ts` becomes a serverless function automatically).
+| Category | Templates |
+|---|---|
+| **Cloud & Infrastructure** | Exposed S3 buckets · Azure Blob containers · Terraform state files (`.tfstate`/`.tfvars`) · misconfigured Kubernetes dashboards |
+| **API & JS leakage** | Source maps (`.map`) · Firebase configurations · Swagger/OpenAPI docs · GraphQL endpoints with introspection |
+| **SaaS secrets** | Public Notion pages · Google Drive spreadsheets with PII · public Trello boards |
+| **Database & server logs** | Downloadable SQLite files · `.env` files with credentials · `phpinfo()` pages · unauthenticated Jira dashboards |
+
+Every template carries a short description, an impact rating, and tags — you always know what you're looking for and why it matters before you run it.
+
+### The engines
+
+| Engine | Notes |
+|---|---|
+| Google | Default; full dork syntax |
+| Bing / DuckDuckGo | Query syntax auto-corrected where the operators differ |
+| Shodan | For infrastructure-facing queries |
+| Censys | For certificate/host discovery queries |
+
+Switch engines from one dropdown; the same dork is rebuilt for whichever you pick.
+
+---
+
+## The AI analysis (optional)
+
+Each dork has an **Analyze** action. With an AI key configured, a serverless function sends the query to the model and gets back three things: why this exposure is dangerous, how an administrator fixes it, and a risk level (Critical / High / Medium / Low). It's the "so what" behind the query, next to the query.
+
+Providers: **GLM (Z.ai)** by default, Google Gemini optional. The key lives only in your deployment's environment variables — the browser talks to `/api/ai` and never sees or sends any key.
+
+Nothing depends on the AI. Without a key, every dork and every engine works exactly the same.
+
+---
+
+## Deploy to Vercel (AI analysis included)
+
+1. Push this repo to GitHub.
+2. Import it on [vercel.com](https://vercel.com) — Vite is auto-detected; `api/ai.ts` becomes a serverless function.
 3. In **Project → Settings → Environment Variables**, add:
-   - `GLM_API_KEY` — your **Z.ai (GLM) key** (**server-side only**) — powers AI analysis
+   - `GLM_API_KEY` — your [Z.ai](https://z.ai) key (server-side only)
    - `GLM_MODEL` *(optional)* — defaults to `glm-4.5-flash`
    - `GLM_BASE_URL` *(optional)* — defaults to `https://api.z.ai/api/paas/v4`
    - `GEMINI_API_KEY` *(optional)* — Google alternative (key starts with `AIza`); GLM wins if both are set
-4. Deploy. The browser calls `/api/ai`; the key stays on the server.
+4. Deploy.
 
 > Already pasted a GLM key into `GEMINI_API_KEY`? It still works — a non-`AIza` key in that variable is routed to GLM automatically. Renaming it to `GLM_API_KEY` is cleaner though.
 
-### GitHub Pages / any static host (dorking only)
+## Static hosting (dorking only)
 
-Static hosting has no server side, so **AI analysis is disabled** there by design —
-the dork database and multi-engine search work fully. **Never** embed a Gemini
-key in a static build (e.g. via `VITE_API_KEY`): any key shipped to the browser
-is public within minutes of deploying.
+GitHub Pages, Netlify, or any static host: `npm run build` and upload `dist/`. The dork library and all five engines work fully. AI analysis is disabled by design — a static host has no server side, and there is nowhere safe to put a key.
 
-### Local Development
+## Local development
 
 ```bash
 git clone https://github.com/Kcoof/sentineldork.git
 cd sentineldork
 npm install
-npm run dev        # UI at http://localhost:5173
-npx vercel dev     # run this instead to also get the /api/gemini proxy locally
+npm run dev        # UI at http://localhost:5173 (no AI)
+npx vercel dev     # instead: also runs /api/ai locally (set GLM_API_KEY in .env.local)
 ```
 
-For `vercel dev`, set `GLM_API_KEY` first (`export GLM_API_KEY=...` or
-`.env.local` — it is read server-side only).
+---
 
-## 🔐 Security model
+## Security model
 
 | Where the key lives | Who can see it |
 |---|---|
-| `GLM_API_KEY` / `GEMINI_API_KEY` (Vercel env) | Serverless function only ✅ |
-| Any `VITE_*` variable | Everyone — shipped in the JS bundle ❌ |
+| `GLM_API_KEY` / `GEMINI_API_KEY` (Vercel env) | Serverless function only |
+| Any `VITE_*` variable | Everyone — shipped in the JS bundle |
 
-If you previously deployed with a build-time API key: **revoke it** in Google AI
-Studio and generate a new one.
+If you previously deployed with a build-time API key: **revoke it** and generate a new one. Any key shipped to the browser is public within minutes.
 
-## 🛠️ Technical Stack
+---
 
-- **Frontend**: React 19, Vite, Tailwind CSS, lucide-react
-- **AI**: GLM (Z.ai) via serverless proxy (`api/ai.ts`), Gemini optional, zero client-side SDK
-- **Deployment**: Vercel (with functions) or any static host (dorks only)
+## Stack
 
-## ⚖️ Disclaimer
+- React 19, Vite, Tailwind CSS, lucide-react
+- AI: GLM (Z.ai) via the `api/ai.ts` serverless function, Gemini optional
+- Deployment: Vercel (with functions) or any static host (dorks only)
 
-This tool is for educational and ethical security testing purposes only. The author is not responsible for any misuse or damage caused by this application. Always obtain proper authorization before testing any target.
+## Authorized testing only
+
+SentinelDork queries search engines — the data is public, but acting on what you find (opening an exposed bucket, probing a dashboard) requires authorization: your own assets, a program you're registered with, or written permission. Respect the scope of any program you test.
